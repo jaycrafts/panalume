@@ -417,7 +417,7 @@
   .tl-ev { position: absolute; display: flex; flex-direction: column; gap: 1px; min-height: 1.4em; overflow: hidden; padding: 3px 7px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--c) 72%, #000); color: #fff; font: inherit; font-size: .74em; line-height: 1.25; text-align: left; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
   .tl-ev.now { box-shadow: 0 0 0 2px var(--c); }
   .tl-ev.past { opacity: .5; }
-  .tl-ti { font-weight: 600; overflow-wrap: break-word; hyphens: auto; }
+  .tl-ti { font-weight: 600; }
   .tl-tm, .tl-loc { opacity: .85; font-size: .92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Phone-sized cards: just the titles, in tighter blocks. */
   .tl.narrow { --gut: 2.6em; }
