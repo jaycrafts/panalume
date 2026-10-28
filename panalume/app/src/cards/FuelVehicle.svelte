@@ -185,7 +185,7 @@
     </button>{/if}
     <div class="info">
       <div class="name">{name}</div>
-      {#if range && show('range')}<div class="range">{formatNumber(range.v, 0)} <span>{range.u}</span></div>{/if}
+      {#if range && show('range')}<div class="range">{formatNumber(range.v, 0)} <span>{range.u} range</span></div>{/if}
       {#if status && show('status')}<div class="dim" class:run={running || remoteOn}>{#if running || remoteOn}<Icon icon="mdi:engine" size="1em" />{/if}{status}</div>{/if}
       <div class="chipbox" bind:clientWidth={roomW}>
         {#snippet chipset()}
@@ -241,7 +241,7 @@
   .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; z-index: 1; }
   .name { font-weight: 600; font-size: 1.1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .range { font-size: 1.6em; font-weight: 600; line-height: 1; }
-  .range span { font-size: .5em; color: var(--muted); }
+  .range span { font-size: .5em; font-weight: 500; color: var(--muted); }
   .dim { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dim.run { color: #5bd88f; }
   .chipbox { position: relative; margin-top: 4px; margin-left: -8px; }
