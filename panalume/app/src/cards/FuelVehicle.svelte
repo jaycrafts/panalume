@@ -41,7 +41,7 @@
   }
   import { nameOf } from '../lib/device.js';
   export const meta = {
-    type: 'fuel_vehicle', name: 'Fuel vehicle', icon: 'mdi:car', category: 'Energy',
+    type: 'fuel_vehicle', name: 'Ford/Lincoln Gas Vehicle', icon: 'mdi:car', category: 'Energy',
     size: { w: 420, h: 240 }, tap: 'none',
     defaults: { tire_unit: '' },
     autofill,
@@ -139,6 +139,11 @@
   const bat = $derived(Number(batE?.state));
   const volts = $derived(Number(batE?.attributes.batteryVoltage ?? batE?.attributes.voltage));
   const batBad = $derived(bat < 40 || (volts > 0 && volts < 11.9));
+  // Above ~13.2 V with the engine running, the alternator is charging the battery,
+  // so the voltage says nothing about its charge (just after parking it's still
+  // settling down from there); a rested battery below ~12.2 V is getting low.
+  const charging = $derived(volts >= 13.2 && (running || remoteOn || !ignE || gone(ignE)));
+  const voltsLow = $derived(volts > 0 && volts < 12.2 && !running && !remoteOn);
   const tireE = $derived(ent(props.tires));
   const TO = { psi: 14.5038, bar: 1, kpa: 100 };
   function pressure(v) {
@@ -206,7 +211,7 @@
       {#if batE && show('battery')}<button class="tile" onclick={() => info(batE)}>
         <span class="k"><Icon icon="mdi:car-battery" size="1em" />12V battery</span>
         <span class="v" class:badv={batBad}>{isNaN(bat) ? '—' : Math.round(bat) + '%'}</span>
-        <span class="sub">{volts > 0 ? `${formatNumber(volts, 1)} V` : ''}</span>
+        <span class="sub" class:chg={charging} class:low={voltsLow} title={charging ? 'The alternator is charging the battery' : voltsLow ? 'Resting voltage is low' : 'Resting voltage'}>{volts > 0 ? `${charging ? 'Charging · ' : ''}${formatNumber(volts, 1)} V` : ''}</span>
       </button>{/if}
       {#if tireE && show('tires')}<button class="tile" onclick={() => info(tireE)}>
         <span class="k"><Icon icon="mdi:car-tire-alert" size="1em" />Tyres{tireUnit ? ` · ${tireUnit}` : ''}</span>
@@ -250,7 +255,9 @@
   .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 8px 10px; border: 0; border-radius: 12px; background: rgba(255,255,255,.05); color: inherit; font: inherit; text-align: left; }
   .k { display: flex; align-items: center; gap: 5px; font-size: .72em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .v { font-size: 1.15em; font-weight: 600; line-height: 1.1; }
-  .sub { font-size: .72em; color: var(--muted); min-height: 1em; }
+  .sub { font-size: .72em; color: var(--muted); min-height: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .sub.chg { color: #5bd88f; }
+  .sub.low { color: #ffc861; }
   .badv { color: #ff7a90; }
   .bar { width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
   .bar i { display: block; height: 100%; border-radius: 2px; }
