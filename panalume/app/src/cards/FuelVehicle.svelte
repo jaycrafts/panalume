@@ -138,12 +138,14 @@
   const batE = $derived(ent(props.battery));
   const bat = $derived(Number(batE?.state));
   const volts = $derived(Number(batE?.attributes.batteryVoltage ?? batE?.attributes.voltage));
-  const batBad = $derived(bat < 40 || (volts > 0 && volts < 11.9));
+  // The tile shows the voltage when the sensor reports one, else the charge %.
+  const batBad = $derived(volts > 0 ? volts < 11.9 : bat < 40);
   // Above ~13.2 V with the engine running, the alternator is charging the battery,
   // so the voltage says nothing about its charge (just after parking it's still
   // settling down from there); a rested battery below ~12.2 V is getting low.
   const charging = $derived(volts >= 13.2 && (running || remoteOn || !ignE || gone(ignE)));
   const voltsLow = $derived(volts > 0 && volts < 12.2 && !running && !remoteOn);
+  const batNote = $derived(!(volts > 0) ? '' : charging ? 'Charging' : batBad ? 'Very low' : voltsLow ? 'Low' : volts >= 12.9 && !running && !remoteOn ? 'Settling after a drive' : 'Resting');
   const tireE = $derived(ent(props.tires));
   const TO = { psi: 14.5038, bar: 1, kpa: 100 };
   function pressure(v) {
@@ -210,8 +212,8 @@
       </button>{/if}
       {#if batE && show('battery')}<button class="tile" onclick={() => info(batE)}>
         <span class="k"><Icon icon="mdi:car-battery" size="1em" />12V battery</span>
-        <span class="v" class:badv={batBad}>{isNaN(bat) ? '—' : Math.round(bat) + '%'}</span>
-        <span class="sub" class:chg={charging} class:low={voltsLow} title={charging ? 'The alternator is charging the battery' : voltsLow ? 'Resting voltage is low' : 'Resting voltage'}>{volts > 0 ? `${charging ? 'Charging · ' : ''}${formatNumber(volts, 1)} V` : ''}</span>
+        <span class="v" class:badv={batBad} class:lowv={voltsLow && !batBad} class:chgv={charging} title={isNaN(bat) ? '' : `Charge ${Math.round(bat)}%`}>{volts > 0 ? `${formatNumber(volts, 1)} V` : isNaN(bat) ? '—' : Math.round(bat) + '%'}</span>
+        <span class="sub" class:chg={charging} class:low={voltsLow}>{batNote}</span>
       </button>{/if}
       {#if tireE && show('tires')}<button class="tile" onclick={() => info(tireE)}>
         <span class="k"><Icon icon="mdi:car-tire-alert" size="1em" />Tyres{tireUnit ? ` · ${tireUnit}` : ''}</span>
@@ -259,6 +261,8 @@
   .sub.chg { color: #5bd88f; }
   .sub.low { color: #ffc861; }
   .badv { color: #ff7a90; }
+  .lowv { color: #ffc861; }
+  .chgv { color: #5bd88f; }
   .bar { width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
   .bar i { display: block; height: 100%; border-radius: 2px; }
   .tires { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 10px; font-size: .8em; font-variant-numeric: tabular-nums; }
