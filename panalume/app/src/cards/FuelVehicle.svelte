@@ -22,8 +22,11 @@
       ignition: has(`sensor.${p}_ignitionstatus`, `binary_sensor.${p}_ignition`, `binary_sensor.${p}_engine`), remote: has(`switch.${p}_ignition`, `sensor.${p}_remotestartstatus`),
       alarm: has(`sensor.${p}_alarm`, `alarm_control_panel.${p}_alarm`), mileage: has(`sensor.${p}_odometer`, `sensor.${p}_mileage`), location: has(`device_tracker.${p}_tracker`, `device_tracker.${p}`),
     };
-    return { name: nameOf(Object.values(out).filter((id) => id.includes('.'))) || p.replace(/_/g, ' '), ...out };
+    // Ford names its sensors just "Fuel", "Odometer"…, so there may be no shared car name: leave it blank.
+    return { name: nameOf(Object.values(out).filter((id) => id.includes('.'))), ...out };
   }
+  // For the Device box when the car has no name: "fcq_1ab…xyz4827" → "fcq …4827".
+  const label = (car) => fill(car).name || car.p.split('_').map((w) => (w.length >= 12 ? `…${w.slice(-4)}` : w)).join(' ');
   function autofill(ctx) {
     const used = new Set(Object.values(ctx?.cards || {}).filter((c) => c.type === 'fuel_vehicle').map((c) => c.props?.fuel));
     const all = cars();
@@ -34,7 +37,7 @@
     const all = cars();
     if (all.length < 2) return null;
     const cur = all.find((c) => c.fuel === props.fuel);
-    return { current: cur ? fill(cur).name : '', others: all.filter((c) => c !== cur).map((c) => ({ id: c.fuel, name: fill(c).name, props: fill(c) })) };
+    return { current: cur ? label(cur) : '', others: all.filter((c) => c !== cur).map((c) => ({ id: c.fuel, name: label(c), props: fill(c) })) };
   }
   import { nameOf } from '../lib/device.js';
   export const meta = {
