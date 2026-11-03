@@ -117,6 +117,8 @@
   const ms = (v) => (v == null ? NaN : typeof v === 'number' ? v * 1000 : Date.parse(v));
   const openedAt = $derived(open.map((e) => ms(e.last_changed)).filter((x) => !isNaN(x)));
   const openFor = $derived(openedAt.length ? Math.max(0, Math.floor((clock.now - Math.min(...openedAt)) / 60e3)) : 0);
+  // The chip opens the door that's been open longest, or else the one that changed last.
+  const doorToShow = $derived(open.length ? open.reduce((a, b) => (ms(b.last_changed) < ms(a.last_changed) ? b : a)) : doors.reduce((a, b) => (ms(b.last_changed) > ms(a.last_changed) ? b : a), doors[0]));
   const doorText = $derived(!open.length ? 'Doors closed' : `${open.length === 1 ? short(open[0]).replace(/\s+door$/i, '') + ' door' : `${open.length} doors`} open${openFor ? ` · ${openFor} min` : ''}`);
 
   // Convertible zones: Samsung's raw modes ("cv_ttype_rf9000a_meat_fish") as words.
@@ -189,7 +191,7 @@
     <div class="head">
       <Icon icon="mdi:fridge-outline" size="1.2em" />
       <span class="nm">{name}</span>
-      {#if doors.length && show('doors')}<button class="chip" class:ok={!open.length} class:bad={open.length} class:pulse={openFor >= 1} data-stop onclick={() => info(open[0] || doors[0])}><Icon icon={open.length ? 'mdi:fridge-alert-outline' : 'mdi:check-circle-outline'} size="1em" /><span>{doorText}</span></button>{/if}
+      {#if doors.length && show('doors')}<button class="chip" class:ok={!open.length} class:bad={open.length} class:pulse={openFor >= 1} data-stop onclick={() => info(doorToShow)}><Icon icon={open.length ? 'mdi:fridge-alert-outline' : 'mdi:check-circle-outline'} size="1em" /><span>{doorText}</span></button>{/if}
     </div>
 
     {#if alarm}<button class="banner" data-stop onclick={() => info(alarmE)}><Icon icon="mdi:alert" size="1em" />{alarmText}</button>{/if}
