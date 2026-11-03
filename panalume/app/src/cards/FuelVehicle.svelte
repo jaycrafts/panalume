@@ -173,6 +173,9 @@
 </script>
 
 <div class="fv" class:short>
+  {#if !props.fuel}
+  <div class="hint">Pick the car's fuel level in the card's settings.</div>
+  {:else}
   <div class="top">
     {#if show('ring')}<button class="ring" data-stop onclick={() => info(fuelE)} aria-label="Fuel {isNaN(fuel) ? '' : Math.round(fuel) + '%'}">
       <svg viewBox="0 0 100 100">
@@ -226,10 +229,12 @@
       {#if where && show('location')}<button data-stop onclick={() => info(locE)}><Icon icon={where === 'Home' ? 'mdi:home' : 'mdi:map-marker'} size="1em" />{where}</button>{/if}
     </div>
   {/if}
+  {/if}
 </div>
 
 <style>
   .fv { height: 100%; display: flex; flex-direction: column; gap: 10px; position: relative; }
+  .hint { color: var(--muted); font-size: .82em; margin: auto; }
   .top { flex: 1; min-height: 0; display: flex; align-items: center; gap: 16px; position: relative; }
   .ring { position: relative; height: 100%; max-height: 130px; aspect-ratio: 1; flex: none; container-type: inline-size; padding: 0; border: 0; background: none; color: inherit; font: inherit; }
   .ring svg { width: 100%; height: 100%; }
