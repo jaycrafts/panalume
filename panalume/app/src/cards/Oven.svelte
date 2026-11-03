@@ -111,10 +111,12 @@
   }
   const list0 = $derived(['a', 'b'].map(oven).filter(Boolean));
 
-  // Once an oven is off, Whirlpool stops reporting its temperature. For an hour,
-  // warn that it might still be hot if its last reading before going off (from
-  // history, so a reload still finds it) was hot.
-  const HOT_FOR = 60 * 60e3;
+  // Once an oven is off, Whirlpool stops reporting its temperature. Warn that it
+  // might still be hot if its last reading before going off (from history, so a
+  // reload still finds it) was hot: for 30 minutes after up to 250 °F (121 °C),
+  // an hour up to 400 °F (204 °C), and 90 minutes above that.
+  const HOT_FOR = 90 * 60e3;
+  const hotFor = (v, unit) => { const f = /C/.test(unit) ? v * 1.8 + 32 : v; return (f < 250 ? 30 : f <= 400 ? 60 : 90) * 60e3; };
   let lastHot = $state({}); // oven -> { v, offAt }
   const offKeys = $derived(list0.filter((o) => !o.on && o.tempE && !isNaN(o.since)).map((o) => `${o.p}|${o.tempE.entity_id}|${o.since}`).join(','));
   $effect(() => {
@@ -138,7 +140,7 @@
   const list = $derived(list0.map((o) => {
     const h = lastHot[o.p];
     const hotMin = /C/.test(o.unit) ? 50 : 120;
-    const hot = !o.on && !!h && h.offAt === o.since && clock.now - h.offAt < HOT_FOR && h.v >= hotMin;
+    const hot = !o.on && !!h && h.offAt === o.since && h.v >= hotMin && clock.now - h.offAt < hotFor(h.v, o.unit);
     return { ...o, hot };
   }));
   const name = $derived(t(props.name) || 'Oven');
