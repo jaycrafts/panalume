@@ -112,7 +112,10 @@
   // Doors: which are open, and for how long (a door left open pulses after a minute).
   const doors = $derived(list(props.doors));
   const open = $derived(doors.filter((e) => e.state === 'on'));
-  const openFor = $derived(open.length ? Math.max(0, Math.floor((clock.now - Math.min(...open.map((e) => new Date(e.last_changed).getTime()))) / 60e3)) : 0);
+  // last_changed is seconds since 1970 from the live feed (a date string elsewhere).
+  const ms = (v) => (v == null ? NaN : typeof v === 'number' ? v * 1000 : Date.parse(v));
+  const openedAt = $derived(open.map((e) => ms(e.last_changed)).filter((x) => !isNaN(x)));
+  const openFor = $derived(openedAt.length ? Math.max(0, Math.floor((clock.now - Math.min(...openedAt)) / 60e3)) : 0);
   const doorText = $derived(!open.length ? 'Doors closed' : `${open.length === 1 ? short(open[0]).replace(/\s+door$/i, '') + ' door' : `${open.length} doors`} open${openFor ? ` · ${openFor} min` : ''}`);
 
   // Convertible zones: Samsung's raw modes ("cv_ttype_rf9000a_meat_fish") as words.
