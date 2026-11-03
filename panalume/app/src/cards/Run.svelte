@@ -2,14 +2,15 @@
   export const meta = {
     type: 'run', name: 'Run (automations, scripts, scenes)', icon: 'mdi:play-circle-outline', category: 'Controls',
     size: { w: 420, h: 180 }, tap: 'none',
-    defaults: { title: '', items: [], names: '', confirm: false, conditions: false, show_last: true },
+    defaults: { title: '', items: [], names: '', hide_names: false, confirm: false, conditions: false, hide_last: false },
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'items', label: 'Automations, scripts and scenes', type: 'entities', domain: ['automation', 'script', 'scene'] },
       { key: 'names', label: 'Names (one per line, in the same order; a blank line keeps the entity’s name)', type: 'textarea' },
+      { key: 'hide_names', label: 'Hide names (just the icon, e.g. when the title says it)', type: 'bool' },
       { key: 'confirm', label: 'Tap twice to run (asks “Tap again to run”)', type: 'bool' },
       { key: 'conditions', label: 'Automations: only run when their conditions are met', type: 'bool' },
-      { key: 'show_last', label: 'Show when each last ran', type: 'bool' },
+      { key: 'hide_last', label: 'Hide when each last ran', type: 'bool' },
     ],
   };
 </script>
@@ -70,7 +71,7 @@
     <div class="hint">Pick the automations, scripts or scenes to run in the card's settings.</div>
   {:else}
     {#if props.title}<div class="title">{t(props.title)}</div>{/if}
-    <div class="grid" style="--cols:{cols}" data-stop>
+    <div class="grid" class:bare={props.hide_names} style="--cols:{cols}" data-stop>
       {#each items as it (it.e.entity_id)}
         {@const s = st[it.e.entity_id] || ''}
         <button class="tile {s}" class:down={it.down} onclick={() => run(it)} title={s === 'failed' ? why[it.e.entity_id] : it.label} disabled={it.down}>
@@ -80,14 +81,14 @@
             {:else if s === 'failed'}<Icon icon="mdi:close-thick" size="1.3em" />
             {:else}<Icon icon={it.icon} size="1.3em" />{/if}
           </span>
-          <span class="nm">{it.label}</span>
+          {#if !props.hide_names}<span class="nm">{it.label}</span>{/if}
           <span class="sub">
             {#if s === 'armed'}Tap again to run
             {:else if s === 'running'}Running…
             {:else if s === 'done'}Done
             {:else if s === 'failed'}Failed{why[it.e.entity_id] ? `: ${why[it.e.entity_id]}` : ''}
             {:else if it.down}Unavailable
-            {:else}{props.show_last !== false ? lastText(it.last) : ''}{#if it.autoOff}<span class="off">· auto off</span>{/if}{/if}
+            {:else}{props.hide_last ? '' : lastText(it.last)}{#if it.autoOff}<span class="off">· auto off</span>{/if}{/if}
           </span>
         </button>
       {/each}
@@ -103,6 +104,9 @@
   .tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-width: 0; min-height: 76px; padding: 10px 12px; border: 0; border-radius: 14px; background: rgba(255,255,255,.06); color: inherit; font: inherit; text-align: left; transition: background .2s, transform .1s; }
   .tile:active { transform: scale(.97); }
   .ic { display: grid; place-items: center; width: 2em; height: 2em; border-radius: 10px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  /* Names hidden: the icon, larger, centred over the status line. */
+  .bare .tile { align-items: center; text-align: center; gap: 6px; }
+  .bare .ic { width: 2.6em; height: 2.6em; border-radius: 14px; font-size: 1.15em; }
   .nm { max-width: 100%; font-weight: 600; font-size: .9em; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .sub { max-width: 100%; font-size: .72em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .off { color: #ffc861; margin-left: .35em; }
