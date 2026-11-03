@@ -73,7 +73,8 @@
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { formatNumber, toggle } from '../lib/entity.js';
-  import { callService } from '../lib/ha.svelte.js';
+  import { untrack } from 'svelte';
+  import { callService, conn, history } from '../lib/ha.svelte.js';
   import { clock } from '../lib/clock.svelte.js';
   import { app } from '../lib/config.svelte.js';
   let { props, w = 460, h = 260 } = $props();
@@ -106,16 +107,51 @@
     const mins = on && !isNaN(since) ? Math.max(0, Math.floor((clock.now - since) / 60e3)) : NaN;
     const ready = phase === 'cook' && clock.now - ms(st.last_changed) < 60e3;
     const label = t(props[`${p}_name`]) || (st.attributes.friendly_name || '').replace(/^\S+\s+/, '').replace(/\s+state$/i, '') || 'Oven';
-    return { p, st, label, on, phase, mode: modeKey, cur, tgt, unit, pct, mins, ready, light: ent(props[`${p}_light`]), stop: ent(props[`${p}_stop`]), tempE };
+    return { p, st, label, on, phase, mode: modeKey, cur, tgt, unit, pct, since, mins, ready, light: ent(props[`${p}_light`]), stop: ent(props[`${p}_stop`]), tempE };
   }
-  const list = $derived(['a', 'b'].map(oven).filter(Boolean));
+  const list0 = $derived(['a', 'b'].map(oven).filter(Boolean));
+
+  // Once an oven is off, Whirlpool stops reporting its temperature. For an hour,
+  // show the last reading from before it went off (from history, so a reload
+  // still finds it) if that was hot.
+  const HOT_FOR = 60 * 60e3;
+  let lastHot = $state({}); // oven -> { v, offAt }
+  const offKeys = $derived(list0.filter((o) => !o.on && o.tempE && !isNaN(o.since)).map((o) => `${o.p}|${o.tempE.entity_id}|${o.since}`).join(','));
+  $effect(() => {
+    const keys = offKeys;
+    if (!conn.connected || !keys) return;
+    let alive = true;
+    for (const k of keys.split(',')) {
+      const [p, id, at] = k.split('|');
+      const offAt = Number(at);
+      if (Date.now() - offAt >= HOT_FOR || untrack(() => lastHot[p]?.offAt) === offAt) continue;
+      history([id], 3)
+        .then((res) => {
+          const rows = (res[id] || []).filter((r) => r.s !== '' && Number.isFinite(Number(r.s)) && (r.lu ?? r.lc) * 1000 <= offAt + 5e3);
+          const last = rows[rows.length - 1];
+          if (alive && last) lastHot = { ...untrack(() => lastHot), [p]: { v: Number(last.s), offAt } };
+        })
+        .catch(() => {});
+    }
+    return () => { alive = false; };
+  });
+  const list = $derived(list0.map((o) => {
+    const h = lastHot[o.p];
+    const hotMin = /C/.test(o.unit) ? 50 : 120;
+    const hot = !o.on && h && h.offAt === o.since && clock.now - h.offAt < HOT_FOR && h.v >= hotMin ? { v: h.v, ago: Math.max(0, Math.floor((clock.now - h.offAt) / 60e3)) } : null;
+    return { ...o, hot };
+  }));
   const name = $derived(t(props.name) || 'Oven');
   const onOnes = $derived(list.filter((o) => o.on));
   const status = $derived.by(() => {
     if (!list.length) return { text: '', cls: '' };
     const r = onOnes.find((o) => o.ready);
     if (r) return { text: `${list.length > 1 ? r.label : 'Oven'} ready!`, cls: 'ready' };
-    if (!onOnes.length) return { text: 'Off', cls: '' };
+    if (!onOnes.length) {
+      const hot = list.filter((o) => o.hot);
+      if (hot.length) return { text: `${hot.length > 1 ? 'Both ovens' : list.length > 1 ? hot[0].label : 'Oven'} may still be hot`, cls: 'warm' };
+      return { text: 'Off', cls: '' };
+    }
     if (onOnes.length > 1) return { text: 'Both ovens on', cls: 'hot' };
     const o = onOnes[0];
     return { text: `${list.length > 1 ? o.label + ' ' : ''}${o.phase === 'preheat' ? 'preheating' : 'cooking'}`.replace(/^./, (c) => c.toUpperCase()), cls: o.phase === 'preheat' ? 'warm' : 'hot' };
@@ -146,7 +182,7 @@
     </div>
     <div class="cavs" data-stop>
       {#each list as o (o.p)}
-        <div class="cav {o.phase}">
+        <div class="cav {o.phase}" class:cooling={o.hot}>
           <button class="top" onclick={() => info(o.on ? o.tempE || o.st : o.st)}>
             <span class="k">{#if list.length > 1}{o.label}{:else}{o.on ? modeName(o.mode) : 'Oven'}{/if}</span>
             {#if o.on}
@@ -155,7 +191,12 @@
               <span class="sub">{o.phase === 'preheat' ? `Preheating to ${deg(o.tgt, o.unit)}` : `Cooking at ${deg(o.tgt, o.unit)}`}{isNaN(o.mins) ? '' : ` · ${dur(o.mins)}`}</span>
               {#if o.phase === 'preheat' && show('progress') && !isNaN(o.pct)}<span class="bar"><i style="width:{o.pct}%"></i></span>{/if}
             {:else}
-              <span class="v off">Off</span>
+              {#if o.hot}
+                <span class="v cool">{deg(o.hot.v, o.unit)}</span>
+                <span class="sub">Off · when it was stopped{o.hot.ago ? `, ${o.hot.ago} min ago` : ', just now'}</span>
+              {:else}
+                <span class="v off">Off</span>
+              {/if}
             {/if}
           </button>
           {#if (o.light && show('light')) || (o.on && o.stop && show('stop'))}
@@ -194,6 +235,8 @@
   .preheat .v { color: #ffc861; }
   .cook .v { color: #ff9a57; }
   .v.off { color: var(--muted); font-size: 1.5em; }
+  .v.cool { color: color-mix(in srgb, #ffc861 60%, var(--muted)); }
+  .cav.cooling { background: linear-gradient(180deg, rgba(255,200,97,.06), rgba(255,255,255,.04)); }
   .sub { font-size: .72em; color: var(--muted); }
   .bar { width: 100%; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
   .bar i { display: block; height: 100%; border-radius: 3px; background: #ffc861; transition: width .6s; }
