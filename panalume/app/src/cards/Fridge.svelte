@@ -231,7 +231,7 @@
     {#if !compact && show('energy') && (powerE || energyE)}
       <div class="foot" data-stop>
         {#if powerE && !gone(powerE)}<button onclick={() => info(powerE)}><Icon icon="mdi:flash-outline" size="1em" />{formatNumber(powerE.state, 0)} {powerE.attributes.unit_of_measurement || 'W'}</button>{/if}
-        {#if !isNaN(perDay.now)}<button onclick={() => info(energyE)} title="{formatNumber(energyE.state, 1)} {unitOf(energyE) || 'kWh'} so far this month"><Icon icon="mdi:lightning-bolt-outline" size="1em" />{formatNumber(perDay.now, 1)} {unitOf(energyE) || 'kWh'}/day{#if !isNaN(perDay.last)}<span class="dim"> · last month {formatNumber(perDay.last, 1)}</span>{/if}</button>{/if}
+        {#if !isNaN(perDay.now)}<button class="en" onclick={() => info(energyE)} title="Averaging {formatNumber(perDay.now, 1)} {unitOf(energyE) || 'kWh'}/day this month{isNaN(perDay.last) ? '' : `, ${formatNumber(perDay.last, 1)} last month`}"><Icon icon="mdi:lightning-bolt-outline" size="1em" /><span class="et">{formatNumber(energyE.state, 1)} {unitOf(energyE) || 'kWh'} this month{#if !isNaN(perDay.last)} · {formatNumber(lastE.state, 1)} {unitOf(lastE) || 'kWh'} last month{/if}<span class="dim"> · {formatNumber(perDay.now, 1)} {unitOf(energyE) || 'kWh'}/day</span></span></button>{/if}
       </div>
     {/if}
   {/if}
@@ -301,7 +301,9 @@
   .dot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: #ff7a90; }
   .chips { display: flex; gap: 5px; flex-wrap: wrap; flex: none; }
   .foot { display: flex; align-items: center; gap: 14px; flex: none; font-size: .75em; color: var(--muted); min-width: 0; }
-  .foot button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; white-space: nowrap; }
+  .foot button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; white-space: nowrap; flex: none; }
+  .foot .en { flex: 1; min-width: 0; }
+  .et { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .dim { opacity: .7; }
   .compact { gap: 6px; }
   .compact .v { font-size: 1.6em; }
