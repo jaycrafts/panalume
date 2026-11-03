@@ -128,6 +128,21 @@
   const pickZone = $derived(picking ? ent(picking) : null);
   const openZone = (e) => (e.entity_id.startsWith('select.') && e.attributes.options?.length ? (picking = e.entity_id) : info(e));
   const choose = (o) => { callService('select', 'select_option', { option: o }, { entity_id: picking }); picking = null; };
+
+  // Setpoints: − / + within the number's range, then Set once (the general
+  // entity window shows an unlabelled slider).
+  let adjusting = $state(null), target = $state(0);
+  const adjE = $derived(adjusting ? ent(adjusting.set) : null);
+  const step = $derived(Number(adjE?.attributes.step) || 1);
+  const lo = $derived(Number(adjE?.attributes.min ?? -Infinity)), hi = $derived(Number(adjE?.attributes.max ?? Infinity));
+  const unitOf = (e) => e?.attributes.unit_of_measurement || '';
+  const openSet = (c) => {
+    if (!c.set || !c.set.entity_id.startsWith('number.') || gone(c.set)) return info(c.set || c.e);
+    adjusting = { set: c.set.entity_id, label: c.label };
+    target = Number(c.set.state);
+  };
+  const nudge = (d) => (target = Math.min(hi, Math.max(lo, Math.round((target + d * step) / step) * step)));
+  const applySet = () => { if (target !== Number(adjE?.state)) callService('number', 'set_value', { value: target }, { entity_id: adjusting.set }); adjusting = null; };
   const zones = $derived(list(props.zones).map((e) => {
     const zn = short(e).replace(/\s+mode$/i, '');
     const door = doors.find((d) => short(d).toLowerCase().startsWith(zn.toLowerCase().replace(/\s+zone$/, '')));
@@ -154,6 +169,15 @@
   const powerE = $derived(ent(props.power));
   const energyE = $derived(ent(props.energy));
   const lastE = $derived(ent(props.energy_last));
+  // Monthly totals compare badly early in a month, so show the average per day:
+  // this month so far over the days gone (at least half a day), last month over its length.
+  const perDay = $derived.by(() => {
+    const d = new Date(clock.now), start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const days = Math.max(0.5, (d - start) / 864e5);
+    const lastDays = new Date(d.getFullYear(), d.getMonth(), 0).getDate();
+    const now = Number(energyE?.state), last = Number(lastE?.state);
+    return { now: gone(energyE) || isNaN(now) ? NaN : now / days, last: gone(lastE) || isNaN(last) ? NaN : last / lastDays };
+  });
 
   const compact = $derived(h < 190 || w < 300);
 </script>
@@ -173,7 +197,7 @@
     <div class="comps" data-stop>
       {#each comps as c (c.key)}
         {@const lv = level(c.e, c.key)}
-        <button class="comp" onclick={() => info(c.set || c.e)}>
+        <button class="comp" onclick={() => openSet(c)}>
           <span class="k"><Icon icon={c.icon} size="1em" />{c.label}</span>
           <span class="v {lv}">{temp(c.e)}</span>
           {#if c.set}<span class="set">{setText(c.set)}</span>{/if}
@@ -205,9 +229,20 @@
     {#if !compact && show('energy') && (powerE || energyE)}
       <div class="foot" data-stop>
         {#if powerE && !gone(powerE)}<button onclick={() => info(powerE)}><Icon icon="mdi:flash-outline" size="1em" />{formatNumber(powerE.state, 0)} {powerE.attributes.unit_of_measurement || 'W'}</button>{/if}
-        {#if energyE && !gone(energyE)}<button onclick={() => info(energyE)}><Icon icon="mdi:lightning-bolt-outline" size="1em" />{formatNumber(energyE.state, 1)} {energyE.attributes.unit_of_measurement || 'kWh'} this month{#if lastE && !gone(lastE)}<span class="dim"> · {formatNumber(lastE.state, 1)} last month</span>{/if}</button>{/if}
+        {#if !isNaN(perDay.now)}<button onclick={() => info(energyE)} title="{formatNumber(energyE.state, 1)} {unitOf(energyE) || 'kWh'} so far this month"><Icon icon="mdi:lightning-bolt-outline" size="1em" />{formatNumber(perDay.now, 1)} {unitOf(energyE) || 'kWh'}/day{#if !isNaN(perDay.last)}<span class="dim"> · last month {formatNumber(perDay.last, 1)}</span>{/if}</button>{/if}
       </div>
     {/if}
+  {/if}
+  {#if adjE}
+    <div class="picker" data-stop>
+      <div class="ph"><span>{adjusting.label} temperature</span><button class="x" onclick={() => (adjusting = null)} aria-label="Close"><Icon icon="mdi:close" size="1.1em" /></button></div>
+      <div class="adj">
+        <button class="pm" onclick={() => nudge(-1)} disabled={target <= lo} aria-label="Colder"><Icon icon="mdi:minus" size="1.4em" /></button>
+        <div class="tv"><b>{formatNumber(target, step < 1 ? 1 : 0)}{unitOf(adjE)}</b><span>{isFinite(lo) && isFinite(hi) ? `${formatNumber(lo, 0)} to ${formatNumber(hi, 0)}${unitOf(adjE)}` : ''}</span></div>
+        <button class="pm" onclick={() => nudge(1)} disabled={target >= hi} aria-label="Warmer"><Icon icon="mdi:plus" size="1.4em" /></button>
+      </div>
+      <button class="apply" disabled={target === Number(adjE.state)} onclick={applySet}>{target === Number(adjE.state) ? 'Currently' : 'Set to'} {formatNumber(target, step < 1 ? 1 : 0)}{unitOf(adjE)}</button>
+    </div>
   {/if}
   {#if pickZone}
     <div class="picker" data-stop>
@@ -227,6 +262,14 @@
   .ph { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
   .x { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(255,255,255,.08); color: inherit; }
   .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .adj { flex: 1; display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .pm { display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: 50%; background: rgba(255,255,255,.08); color: inherit; }
+  .pm:disabled { opacity: .3; }
+  .tv { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 5.5em; }
+  .tv b { font-size: 2.4em; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .tv span { font-size: .72em; color: var(--muted); }
+  .apply { align-self: stretch; padding: 10px; border: 0; border-radius: 12px; background: var(--accent); color: #0b1220; font: inherit; font-weight: 600; }
+  .apply:disabled { background: rgba(255,255,255,.08); color: var(--muted); }
   .opt { padding: 10px 14px; border: 0; border-radius: 12px; background: rgba(255,255,255,.07); color: inherit; font: inherit; font-size: .9em; }
   .opt.sel { background: color-mix(in srgb, var(--accent) 35%, transparent); font-weight: 600; }
   .hint { color: var(--muted); font-size: .82em; margin: auto; }
