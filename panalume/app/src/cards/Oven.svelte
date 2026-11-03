@@ -52,12 +52,13 @@
   export const meta = {
     type: 'oven', name: 'Oven', icon: 'mdi:stove', category: 'Controls',
     size: { w: 460, h: 260 }, tap: 'none',
-    defaults: {},
+    defaults: { layout: 'stacked' },
     autofill,
     devices,
     sections: [{ key: 'progress', label: 'Preheat progress' }, { key: 'light', label: 'Light buttons' }, { key: 'stop', label: 'Stop buttons' }],
     fields: [
       { key: 'name', label: 'Name', type: 'text' },
+      { key: 'layout', label: 'Double ovens', type: 'select', options: [{ value: 'stacked', label: 'Stacked, upper above lower' }, { value: 'side', label: 'Side by side' }] },
       { key: 'a_name', label: 'First oven’s name (blank: from the entity, e.g. Upper oven)', type: 'text' },
       ...ovenFields('a', 'First oven'),
       { key: 'b_name', label: 'Second oven’s name (blank: from the entity)', type: 'text' },
@@ -170,10 +171,12 @@
   }
   const deg = (v, u) => (isNaN(v) ? '—' : `${formatNumber(v, 0)}${u}`);
   const dur = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`);
+  // Stacked like the oven itself (upper above lower), unless set side by side with room for it.
   const narrow = $derived(w < 340 && list.length > 1);
+  const stacked = $derived(list.length > 1 && (props.layout !== 'side' || narrow));
 </script>
 
-<div class="ov" class:narrow>
+<div class="ov" class:stacked>
   {#if !props.a_state}
     <div class="hint">Pick the oven in the card's settings.</div>
   {:else}
@@ -221,7 +224,13 @@
   .pulse { animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: .45; } }
   .cavs { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
-  .narrow .cavs { grid-template-columns: 1fr; }
+  /* Stacked: a row per oven, its details on the left and its buttons on the right. */
+  .stacked .cavs { grid-template-columns: 1fr; grid-auto-rows: minmax(0, 1fr); }
+  .stacked .cav { flex-direction: row; align-items: center; }
+  .stacked .top { padding: 8px 12px; }
+  .stacked .acts { flex: none; align-items: center; padding: 0 12px 0 0; }
+  .stacked .act.stop { flex: none; min-width: 7.5em; }
+  .stacked .v { font-size: 1.7em; }
   .cav { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-radius: 14px; background: rgba(255,255,255,.05); overflow: hidden; }
   .cav.preheat { background: linear-gradient(180deg, rgba(255,200,97,.12), rgba(255,255,255,.04)); }
   .cav.cook { background: linear-gradient(180deg, rgba(255,154,87,.16), rgba(255,255,255,.04)); }
