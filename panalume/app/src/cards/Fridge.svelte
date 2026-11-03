@@ -80,6 +80,7 @@
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { formatNumber, toggle } from '../lib/entity.js';
+  import { callService } from '../lib/ha.svelte.js';
   import { clock } from '../lib/clock.svelte.js';
   import { app } from '../lib/config.svelte.js';
   let { props, w = 440, h = 300 } = $props();
@@ -121,6 +122,12 @@
   // Convertible zones: Samsung's raw modes ("cv_ttype_rf9000a_meat_fish") as words.
   const NICE = { softfreeze: 'Soft freeze', meat_fish: 'Meat & fish', fruit_veggies: 'Fruit & veggies', cool_drinks: 'Cool drinks' };
   const mode = (s) => { const k = String(s || '').replace(/^(cv_)?ttype_(rf\d+\w*?_)?/i, '').toLowerCase(); return NICE[k] || k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()); };
+  // A zone's modes in words, picked right in the card (the general entity
+  // window would list Samsung's raw codes).
+  let picking = $state(null);
+  const pickZone = $derived(picking ? ent(picking) : null);
+  const openZone = (e) => (e.entity_id.startsWith('select.') && e.attributes.options?.length ? (picking = e.entity_id) : info(e));
+  const choose = (o) => { callService('select', 'select_option', { option: o }, { entity_id: picking }); picking = null; };
   const zones = $derived(list(props.zones).map((e) => {
     const zn = short(e).replace(/\s+mode$/i, '');
     const door = doors.find((d) => short(d).toLowerCase().startsWith(zn.toLowerCase().replace(/\s+zone$/, '')));
@@ -177,7 +184,7 @@
     {#if !compact && zones.length && show('zones')}
       <div class="zones" data-stop>
         {#each zones as z (z.e.entity_id)}
-          <button class="zone" onclick={() => info(z.e)}><span class="zn">{z.name}</span><b>{z.mode}</b>{#if z.open}<i class="dot" title="Door open"></i>{/if}</button>
+          <button class="zone" onclick={() => openZone(z.e)}><span class="zn">{z.name}</span><b>{z.mode}</b>{#if z.open}<i class="dot" title="Door open"></i>{/if}</button>
         {/each}
       </div>
     {/if}
@@ -202,10 +209,26 @@
       </div>
     {/if}
   {/if}
+  {#if pickZone}
+    <div class="picker" data-stop>
+      <div class="ph"><span>{zones.find((z) => z.e.entity_id === picking)?.name || 'Mode'}</span><button class="x" onclick={() => (picking = null)} aria-label="Close"><Icon icon="mdi:close" size="1.1em" /></button></div>
+      <div class="opts">
+        {#each pickZone.attributes.options as o}
+          <button class="opt" class:sel={o === pickZone.state} onclick={() => choose(o)}>{mode(o)}</button>
+        {/each}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
-  .fr { height: 100%; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .fr { position: relative; height: 100%; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .picker { position: absolute; inset: -6px; z-index: 3; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px; background: rgba(16,20,30,.96); backdrop-filter: blur(8px); overflow: auto; }
+  .ph { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
+  .x { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(255,255,255,.08); color: inherit; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opt { padding: 10px 14px; border: 0; border-radius: 12px; background: rgba(255,255,255,.07); color: inherit; font: inherit; font-size: .9em; }
+  .opt.sel { background: color-mix(in srgb, var(--accent) 35%, transparent); font-weight: 600; }
   .hint { color: var(--muted); font-size: .82em; margin: auto; }
   .head { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
   .head :global(svg) { flex: none; }
